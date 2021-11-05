@@ -1,13 +1,13 @@
 /**
  * ArduinoSoftware_Arduino_IDE
  *
- *  Copyright 2016 by Tim Dünte <tim.duente@hci.uni-hannover.de>
+ *  Copyright 2016 by Tim Duente <tim.duente@hci.uni-hannover.de>
  *  Copyright 2016 by Max Pfeiffer <max.pfeiffer@hci.uni-hannover.de>
  *
- *  Licensed under "The MIT License (MIT) – military use of this product is forbidden – V 0.2".
+ *  Licensed under "The MIT License (MIT) - military use of this product is forbidden - V 0.2".
  *  Some rights reserved. See LICENSE.
  *
- * @license "The MIT License (MIT) – military use of this product is forbidden – V 0.2"
+ * @license "The MIT License (MIT) - military use of this product is forbidden - V 0.2"
  * <https://bitbucket.org/MaxPfeiffer/letyourbodymove/wiki/Home/License>
  */
 
@@ -24,17 +24,19 @@
 
 EMSChannel::EMSChannel(uint8_t channel_to_Pads, uint8_t channel_to_Pads_2,
 		uint8_t led_active_pin, AD5252* digitalPoti, uint8_t wiperIndex) {
+
 	intensity = 0;
-	activated = false;
+	state = OFF;
 
-	maxIntensity = 215; // Die differnez ist gleich dem max Wert
-	minIntensity = 55; //
+	maxIntensity = 215;
+	minIntensity = 55;
 
-	this->channel_to_Pads = channel_to_Pads;
-	this->channel_to_Pads_2 = channel_to_Pads_2;
-	this->led_active_pin = led_active_pin;
+	this->switch_1 = channel_to_Pads;
+	this->switch_2 = channel_to_Pads_2;
+	this->channel_active_led = led_active_pin;
 
-	endTime = 1;
+	endTime = 0;
+	deactivatingTime = 0;
 	onTimeChannel = 1;
 
 	this->digitalPoti = digitalPoti;
@@ -43,56 +45,66 @@ EMSChannel::EMSChannel(uint8_t channel_to_Pads, uint8_t channel_to_Pads_2,
 	pinMode(channel_to_Pads, OUTPUT);
 	pinMode(channel_to_Pads_2, OUTPUT);
 	pinMode(led_active_pin, OUTPUT);
+	this->deactivateChannel();
 
-	digitalWrite(channel_to_Pads_2, LOW);
-	digitalWrite(channel_to_Pads, LOW);
-	digitalWrite(led_active_pin, LOW);
 }
 
 EMSChannel::~EMSChannel() {
+
 }
 
 //---------- public ----------------------------------------------------
 /*
- * Starts the communication with the digital Poti. Must be called for initialization
+ * Starts the communication with the digital Poti. Must be called for initialization.
  */
 void EMSChannel::start() {
 	Wire.begin();
 }
 
 /*
- * Schaltet das EMS-Signal auf die Pads.
+ * Routes the EMS signal to the electrodes
  */
 void EMSChannel::activate() {
-	digitalWrite(channel_to_Pads, HIGH);
-	digitalWrite(channel_to_Pads_2, HIGH);
-	activated = true;
-	digitalWrite(led_active_pin, HIGH);
+	digitalWrite(switch_1, HIGH);
+	digitalWrite(switch_2, HIGH);
+	state = ON;
+	digitalWrite(channel_active_led, HIGH);
 }
+
 /*
- * Schaltet das EMS-Signal auf den MosFet.
+ * Routes the EMS signal to the MOSFets
  */
 void EMSChannel::deactivate() {
-	digitalPoti->setPosition(wiperIndex, 255);
-	delay(50);
-	digitalWrite(led_active_pin, LOW);
-	digitalWrite(channel_to_Pads_2, LOW);
-	digitalWrite(channel_to_Pads, LOW);
-	activated = false;
-	endTime = 0;
+	if (state != DEACTIVATING) {
+		digitalPoti->setPosition(wiperIndex, 255);
+		state = DEACTIVATING;
+		deactivatingTime = millis() + 50;
+	}
 }
 
-/* EN: Proofs if the channel is active
+/*
+ * Routes the EMS signal to the MOSFets
+ */
+void EMSChannel::deactivateChannel() {
+	digitalWrite(channel_active_led, LOW);
+	digitalWrite(switch_2, LOW);
+	digitalWrite(switch_1, LOW);
+	endTime = 0;
+	state = OFF;
+}
+
+/*
+ * Proofs if the channel is active
  */
 bool EMSChannel::isActivated() {
-	return activated;
+	return (state == ON);
 }
 
-/* Sets the intensity from 0-100
- *
+/*
+ * Sets the intensity from 0-100
  */
-void EMSChannel::setIntensity(int intensity) {
-	this->intensity = int(
+void EMSChannel::setIntensity(uint8_t intensity) {
+	this->intensity = uint8_t(
 			((maxIntensity - minIntensity) * intensity) * 0.01f + 0.5f)
 			+ minIntensity;
 
@@ -102,13 +114,13 @@ void EMSChannel::setIntensity(int intensity) {
 		this->intensity = POTI_STEPS_DOWN;
 	}
 
-	int resistorLevel = POTI_STEPS_UP - this->intensity;
+	uint8_t resistorLevel = POTI_STEPS_UP - this->intensity;
 
 	digitalPoti->setPosition(wiperIndex, resistorLevel);
 }
 
-/* Return the intensity in a range of 0-100
-
+/*
+ * Return the intensity in a range of 0-100
  */
 int EMSChannel::getIntensity() {
 	return intensity;
@@ -128,23 +140,37 @@ void EMSChannel::applySignal() {
 	endTime = millis() + onTimeChannel;
 }
 
-
 int EMSChannel::check() {
-	if (endTime && endTime <= millis()) {
-		deactivate();
-		return 1;
+	int channel_deactivated = 0;
+	switch (state) {
+	case ON:
+		if (endTime && endTime <= millis()) {
+			deactivate();
+		}
+		break;
+	case DEACTIVATING:
+		if (deactivatingTime && deactivatingTime <= millis()) {
+			deactivateChannel();
+			deactivatingTime = 0;
+
+			channel_deactivated = 1;
+		}
+		break;
+	case OFF:
+		break;
 	}
-	return 0;
+
+	return channel_deactivated;
 }
 
 //maxIntensity in percent
 void EMSChannel::setMaxIntensity(int maxIntensity) {
-	this->maxIntensity = int(POTI_STEPS_UP * maxIntensity * 0.01f + 0.5f);
+	this->maxIntensity = uint8_t(POTI_STEPS_UP * maxIntensity * 0.01f + 0.5f);
 }
 
 //minIntensity in percent
 void EMSChannel::setMinIntensity(int minIntensity) {
-	this->minIntensity = int(POTI_STEPS_UP * minIntensity * 0.01f + 0.5f);
+	this->minIntensity = uint8_t(POTI_STEPS_UP * minIntensity * 0.01f + 0.5f);
 }
 
 //---------- private ----------------------------------------------------

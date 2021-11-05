@@ -1,13 +1,13 @@
 /**
  * ArduinoSoftware_Arduino_IDE
  *
- *  Copyright 2016 by Tim Dünte <tim.duente@hci.uni-hannover.de>
+ *  Copyright 2016 by Tim Duente <tim.duente@hci.uni-hannover.de>
  *  Copyright 2016 by Max Pfeiffer <max.pfeiffer@hci.uni-hannover.de>
  *
- *  Licensed under "The MIT License (MIT) – military use of this product is forbidden – V 0.2".
+ *  Licensed under "The MIT License (MIT) - military use of this product is forbidden - V 0.2".
  *  Some rights reserved. See LICENSE.
  *
- * @license "The MIT License (MIT) – military use of this product is forbidden – V 0.2"
+ * @license "The MIT License (MIT) - military use of this product is forbidden - V 0.2"
  * <https://bitbucket.org/MaxPfeiffer/letyourbodymove/wiki/Home/License>
  */
 
@@ -21,10 +21,10 @@
 
 #include "EMSSystem.h"
 
-EMSSystem::EMSSystem(int channels) {
+EMSSystem::EMSSystem(uint8_t channels) {
 	emsChannels = (EMSChannel**) malloc(channels * sizeof(EMSChannel*));
-	channelCount = channels;
-	size = 0;
+	maximum_channel_count = channels;
+	current_channel_count = 0;
 }
 
 EMSSystem::~EMSSystem() {
@@ -32,84 +32,93 @@ EMSSystem::~EMSSystem() {
 }
 
 void EMSSystem::addChannelToSystem(EMSChannel *emsChannel) {
-	if (size < channelCount) {
-		emsChannels[size] = emsChannel;
-		size++;
+	if (current_channel_count < maximum_channel_count) {
+		emsChannels[current_channel_count] = emsChannel;
+		current_channel_count++;
 	}
 }
 
 // get the next number out of a String object and return it
-int EMSSystem::getNextNumberOfSting(String *command, int startIndex) {
-	int number = -1;
-
-	int endIndex = -1;
-
+int EMSSystem::getNextNumberOfString(String *command, uint8_t startIndex) {
+	int value = 0;
+	bool valid = false;
 	// Select the number in the string
-	for (int i = startIndex + 1; i < (int) command->length(); i++) {
+	for (uint8_t i = startIndex + 1; i < command->length(); i++) {
 		char tmp = command->charAt(i);
 		if (tmp >= '0' && tmp <= '9') {
-			if (startIndex == -1) {
-				startIndex = i;
-			}
-			endIndex = i + 1;
+			value = value * 10 + (tmp - '0');
+			valid = true;
 		} else {
 			break;
 		}
-
-		if (endIndex > startIndex && endIndex >= 0 && startIndex >= 0) {
-			String temS = command->substring((unsigned int) startIndex + 1,
-					(unsigned int) endIndex);
-			number = (int) temS.toInt();
-
-		} else {
-			Serial.println(
-					"not in if ERROR: endIndex>startIndex && endIndex>=0 &&  startIndex>=0");
-		}
 	}
-	return number;
+	if (valid)
+		return value;
+	else
+		return -1;
 }
 
 void EMSSystem::doActionCommand(String *command) {
+	int seperatorChannel = -1;
+	int seperatorSignalLength = -1;
+	int seperatorSignalIntensity = -1;
 
-	if (command->length() != 0) {
+	if (command->length() > 0) {
+
 		// Channel
-		int seperatorChannel = command->indexOf(CHANNEL);
+		seperatorChannel = command->indexOf(CHANNEL);
 		int currentChannel = -1;
 
 		if (seperatorChannel != -1) {
 
-			currentChannel = getNextNumberOfSting(command, seperatorChannel);
+			currentChannel = getNextNumberOfString(command, seperatorChannel);
+			Serial.print("Channel ");
+			Serial.println(currentChannel);
 		}
+    else {
+      Serial.println("no channel...");
+    }
 
 		// Signal length onTime
-		int seperatorSignalLength = command->indexOf(TIME);
+		seperatorSignalLength = command->indexOf(TIME);
 		int signalLength = -1;
 		if (seperatorSignalLength != -1) {
-			signalLength = getNextNumberOfSting(command, seperatorSignalLength);
+			signalLength = getNextNumberOfString(command,
+					seperatorSignalLength);
 			if (signalLength > 5000) {
 				//signaleLength max 5000ms
 				signalLength = 5000;
 			}
 			emsChannels[currentChannel]->setSignalLength(signalLength);
+      Serial.print("signalLength ");
+      Serial.println(signalLength);
 		}
+    else {
+       Serial.println("no length...");
+    }
 
 		// Signal Intensity
-		int seperatorSignalIntensity = command->indexOf(INTENSITY);
+		seperatorSignalIntensity = command->indexOf(INTENSITY);
 		int signalIntensity = -1;
 		if (seperatorSignalIntensity != -1) {
-			signalIntensity = getNextNumberOfSting(command,
+			signalIntensity = getNextNumberOfString(command,
 					seperatorSignalIntensity);
 			emsChannels[currentChannel]->setIntensity(signalIntensity - 1);
+      Serial.print("intensity ");
+      Serial.println(signalIntensity);
 		}
+    else {
+      Serial.println("no intensity...");
+    }
 
 		// Apply the command
-		int seperatAction = command->indexOf(ACTION);
-		bool action = false;
-		if (seperatAction != -1) {
-			action = true;
-		}
+		//int seperatAction = command->indexOf(ACTION);
+		//bool action = false;
+//		if (seperatAction != -1) {
+//			action = true;
+//		}
 
-		if (currentChannel >= 0 && currentChannel < size) {
+		if (currentChannel >= 0 && currentChannel < current_channel_count) {
 			emsChannels[currentChannel]->activate();
 			emsChannels[currentChannel]->applySignal();
 		} else {
@@ -118,14 +127,13 @@ void EMSSystem::doActionCommand(String *command) {
 		}
 
 	} else {
-
-		Serial.print("Command = null!!!:");
+		debug_println(F("Command == NULL!"));
 	}
 
 }
 
 void EMSSystem::shutDown() {
-	for (int i = 0; i < size; i++) {
+	for (int i = 0; i < current_channel_count; i++) {
 		emsChannels[i]->deactivate();
 	}
 }
@@ -176,17 +184,17 @@ bool EMSSystem::getChannelAndValue(String *option, int *channel, int *value) {
 		//Check whether channel exists
 		return isInRange((*channel));
 	}
-	//Parsing not successful
+//Parsing not successful
 	return false;
 }
 
 bool EMSSystem::isInRange(int channel) {
-	return (channel >= 0 && channel < size);
+	return (channel >= 0 && channel < current_channel_count);
 }
 
-int EMSSystem::check() {
-	int stopCount = 0;
-	for (int i = 0; i < size; i++) {
+uint8_t EMSSystem::check() {
+	uint8_t stopCount = 0;
+	for (uint8_t i = 0; i < current_channel_count; i++) {
 		stopCount = stopCount + emsChannels[i]->check();
 	}
 	return stopCount;
@@ -199,9 +207,8 @@ void EMSSystem::doCommand(String *command) {
 		} else if (command->charAt(0) == OPTION) {
 			setOption(command);
 		} else {
-			Serial.print("Unknown command: ");
-			Serial.println((*command));
-			Serial.flush();
+			debug_print("EMS SYSTEM: Unknown command: ");
+			debug_println((*command));
 		}
 	}
 }

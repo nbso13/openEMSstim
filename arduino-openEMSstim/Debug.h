@@ -12,36 +12,21 @@
  */
 
 /*
- * Rn4020BTLe.h
+ * Debug.h
  *
- *  Created on: 19.03.2015
+ *  Created on: 21.02.2019
  *      Author: Tim Duente
  */
 
-#include "AltSoftSerial.h"
-#include "Debug.h"
-
-#ifndef RN4020_RN4020BTLE_H_
-#define RN4020_RN4020BTLE_H_
+#ifndef DEBUG_H_
+#define DEBUG_H_
 
 #include <Arduino.h>
 
-class Rn4020BTLe {
-public:
-	Rn4020BTLe(uint8_t HW_Wake_Up, AltSoftSerial *serial);
-	virtual ~Rn4020BTLe();
-	void reset();
-	void init(String bluetoothName);
-	void start_communication();
+//setup for verbose mode (prints debug messages if DEBUG_ON is 1). For a low latency mode, it should be set to 0.
+#define DEBUG_ON 1
 
-private:
-	bool print_response();
-  bool check_baudrate(unsigned long baudrate);
+void debug_println(String msg);
+void debug_print(String msg);
 
-	uint8_t HW_Wake_Up;
-	AltSoftSerial *serial;
-
-
-};
-
-#endif /* RN4020_RN4020BTLE_H_ */
+#endif /* DEBUG_H_ */

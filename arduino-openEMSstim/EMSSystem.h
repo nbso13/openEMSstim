@@ -1,13 +1,13 @@
 /**
  * ArduinoSoftware_Arduino_IDE
  *
- *  Copyright 2016 by Tim Dünte <tim.duente@hci.uni-hannover.de>
+ *  Copyright 2016 by Tim Duente <tim.duente@hci.uni-hannover.de>
  *  Copyright 2016 by Max Pfeiffer <max.pfeiffer@hci.uni-hannover.de>
  *
- *  Licensed under "The MIT License (MIT) – military use of this product is forbidden – V 0.2".
+ *  Licensed under "The MIT License (MIT) - military use of this product is forbidden - V 0.2".
  *  Some rights reserved. See LICENSE.
  *
- * @license "The MIT License (MIT) – military use of this product is forbidden – V 0.2"
+ * @license "The MIT License (MIT) - military use of this product is forbidden - V 0.2"
  * <https://bitbucket.org/MaxPfeiffer/letyourbodymove/wiki/Home/License>
  */
 
@@ -22,6 +22,7 @@
 #define EMSSYSTEM_H_
 
 #include "EMSChannel.h"
+#include "Debug.h"
 
 #define ACTION 'G'
 #define CHANNEL 'C'
@@ -31,25 +32,25 @@
 
 class EMSSystem {
 public:
-	EMSSystem(int channels);
+	EMSSystem(uint8_t channels);
 	virtual ~EMSSystem();
 
 	virtual void addChannelToSystem(EMSChannel *emsChannel);
 	virtual void doCommand(String *command);
 	void shutDown();
-	virtual int check();
+	virtual uint8_t check();
 	static void start();
 
 protected:
 	virtual void doActionCommand(String *command);
 	virtual void setOption(String *option);
 	virtual bool getChannelAndValue(String *option, int *channel, int *value);
-	virtual int getNextNumberOfSting(String *command, int startIndex);
+	virtual int getNextNumberOfString(String *command, uint8_t startIndex);
 
 private:
 	EMSChannel **emsChannels;
-	int channelCount;
-	int size;
+	uint8_t maximum_channel_count;
+	uint8_t current_channel_count;
 	bool isInRange(int channel);
 };
 
