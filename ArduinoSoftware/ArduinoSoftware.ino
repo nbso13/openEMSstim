@@ -130,7 +130,9 @@ void loop() {
 	}
 
    if (ACCEPT_USB_COMMANDS) {
-      if (Serial.available() > 0) {  
+      if (Serial.available() > 0) {
+        Serial.write("received! \n");
+
         String str = Serial.readStringUntil('\n');
         debug_println(str); 
         if(str.charAt(0) != 'x') { // if string does not begin with x, this is a debug format str
@@ -139,6 +141,7 @@ void loop() {
   			 String command = str.substring(1); //cut the x for formatting
          debug_println(F("\tEMS_CMD: Converted command: "));
          debug_println(command);
+//         Serial.write("received! \n");
   			 emsSystem.doCommand(&command);
   
   		}

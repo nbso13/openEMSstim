@@ -1,0 +1,57 @@
+from subprocess import Popen
+import numpy as np
+import time
+
+
+#### read and write to arduino ###
+import serial
+import time
+# port = '/dev/ttys000'
+port = '/dev/tty.usbserial-18DNB483'
+bluetooth = serial.Serial(port, 115200)
+bluetooth.flushInput()
+bluetooth.write(b"2")
+
+#### test serial delay ####
+while(bluetooth.in_waiting):
+    print(bluetooth.readline().decode("utf-8"))
+
+def pingtest():
+    bluetooth.write(b"xC1I100T50G")
+    time.sleep(3)
+
+    tic = time.time()
+    tac = time.time()
+    diff = tac-tic
+    act_lists = []
+    std_dvs = []
+    means = []
+    time_delays = [ 0.7, 0.6, 0.5, 0.4, 0.3]
+    print(diff)
+    for j in time_delays:
+        act_list = []
+        for i in range(30):
+            tic = time.time()
+            bluetooth.write(b"xG")
+            bluetooth.readline()
+            toc = time.time()
+            bluetooth.readline()
+            tac = time.time()
+            bluetooth.readline()
+            tuc = time.time()
+            time.sleep(j)
+            elapsed_to_received = toc-tic
+            elapsed_to_activated = tac-tic
+            elapsed_to_applied = tuc-tic
+            act_list.append(elapsed_to_applied)
+
+            print("elapsed to received: " + str(elapsed_to_received) + ", to activated: " +str (elapsed_to_activated)+ ", to applied: " + str(elapsed_to_applied))
+            # time.sleep(0.2)
+        print("delay: " +str(j) + ", average activated lag: " + str(sum(act_list)/len(act_list)))
+        act_lists.append(act_list)
+        means.append(np.mean(np.array(act_list)))
+        std_dvs.append(np.std(np.array(act_list)))
+
+    print(time_delays)
+    print(means)
+    print(std_dvs)

@@ -1,0 +1,108 @@
+from subprocess import Popen, PIPE
+import numpy as np
+import math
+import pygame
+import time
+import xlsxwriter
+import csv
+
+
+
+def play_rhythm(bluetooth, actual_stim_length, rhythm_substr, repeats, bpm, intensity_level):
+    
+    max_bpm = math.floor(30000/actual_stim_length) #how many eighthnote pulses could you fit into a minute without overlapping?
+    audio_repeats = 2
+
+    if (bpm > max_bpm):
+        print("max metronome bpm is " + str(max_bpm))
+        return
+    if delay_val > actual_stim_length:
+        print("delay_value more than stim length")
+
+    #determine pulse+wait length
+    milliseconds_per_eighthnote = 30000/bpm
+    milliseconds_wait = milliseconds_per_eighthnote - actual_stim_length
+
+    for i in range(repeats): # present the rhythm with appropriate number of repeats
+        for j in range(len(rhythm_substr)):  # go through each eighthnote in the pattern
+            if (rhythm_substr[j] == '1'): # this is a note
+                command_bytes = "xC1I" + str(intensity_level) + "T" + str(actual_stim_length) + "G"
+                byt_com = bytes(command_bytes, encoding='utf8')
+                bluetooth.write(byt_com)
+                print("stim on")
+                time.sleep(actual_stim_length/1000)
+                time.sleep(milliseconds_wait/1000)
+            elif(rhythm_substr[j] == '0'): # rest
+                time.sleep(milliseconds_per_eighthnote/1000)
+            else:
+                print("malformed rhythm pattern: " + rhythm_substr)
+                break
+
+
+#### read and write to arduino ###
+
+import serial
+import time
+# port = '/dev/ttys000'
+port = '/dev/tty.usbserial-18DNB483'
+bluetooth = serial.Serial(port, 115200)
+bluetooth.flushInput()
+bluetooth.write(b"2")
+
+input("adjust ems channel intensity to 10!")
+
+
+### Gathering subject info ###
+
+subject_name = input("subject name?")
+subject_arm = input("subject arm?")
+electrode_config = input("electrode config?") #first pair of numbers is coordinates of 1, x and y, second is coordinates of 2. x and y
+max_ems_stim_intensity = input("max ems stim intensity?")
+pulse_width = input("pulse width?")
+pulse_frequency = input("frequency?") #these may be found on the stimulator and are not usually iterated on (using lit values)
+
+rhythm_substr = "10101010"
+repeats = 1
+bpm = 100
+
+lengths = range(150, 270, 20) #length in ms of stimulation pulse
+intensities = range(20, 100, 10) 
+
+label_header = ["subject name", "subject arm", "electrode config", "rhythm pattern", "bpm", "max_stim_intensity", "pulse width (microsecs)", "frequency (Hz)"]
+header_values = [subject_name, subject_arm, electrode_config, rhythm_substr, bpm, max_ems_stim_intensity, pulse_width, pulse_frequency]
+data_header = ["y ax = intensities (%, " + max_ems_stim_intensity + " is max on toolkit stim), x ax = stim lengths (microsecs)"] + lengths
+
+ 
+### open workbook, define worksheets ###
+
+workbook = xlsxwriter.Workbook(subject_name + '.xlsx')
+pain_worksheet = workbook.add_worksheet("Pain level") # judged subjectively, 1-10, 1 is barely perceivable sensation, 10 is intense pain, 0 is no sensation.
+act_worksheet = workbook.add_worksheet("Actuation level") # judged subjectively, 1-10, 1 is barely visible movement, 10 is complete flexion. 0 is no visible actuation.
+speed_worksheet = workbook.add_worksheet("Actuation speed") # judged subjectively, 1-10, 1 is very slow, 10 is very fast. 0 is no actuation.
+worksheets = [pain_worksheet, act_worksheet, speed_worksheet]
+
+## write header values ##
+
+
+### run testing loop ###
+
+
+for length in lengths:
+    actual_stim_length = length #ms
+    for intensity in intensities:
+        print(" Length: "+ str(length) + ", intensity: " + str(intensity))
+        out = input("Recorded prev values? Changed intensity?")
+        if out == "stop":
+            
+        else:
+            play_rhythm(bluetooth, actual_stim_length, rhythm_substr, repeats, bpm, intensity_level)
+        
+
+
+data = 
+
+
+bluetooth.close()
+print("done")
+
+workbook.close()

@@ -119,8 +119,10 @@ void EMSSystem::doActionCommand(String *command) {
 //		}
 
 		if (currentChannel >= 0 && currentChannel < current_channel_count) {
+      Serial.write("activating \n ");
 			emsChannels[currentChannel]->activate();
 			emsChannels[currentChannel]->applySignal();
+      Serial.write("applied \n");
 		} else {
 			//deactivate all channels if channelNumber is wrong
 			shutDown();
