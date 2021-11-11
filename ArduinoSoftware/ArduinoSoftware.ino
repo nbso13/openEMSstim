@@ -32,7 +32,7 @@
 #define ACCEPT_USB_COMMANDS 1
 
 //setup the Bluetooth module. This is necessary if the toolkit is programmed the first time or if Bluetooth parameter are changed
-#define SETUP_BLUETOOTH 1
+#define SETUP_BLUETOOTH 0
 
 //Initialization of control objects
 AltSoftSerial softSerial;
@@ -132,17 +132,19 @@ void loop() {
    if (ACCEPT_USB_COMMANDS) {
       if (Serial.available() > 0) {
         Serial.write("received! \n");
-
         String str = Serial.readStringUntil('\n');
+        Serial.write("received! 2 \n");
         debug_println(str); 
+        Serial.write("received! 3 \n");
         if(str.charAt(0) != 'x') { // if string does not begin with x, this is a debug format str
           debug_Toolkit(str);
         } else { //then this is properly formatted command
+         Serial.write("received! 4 \n");
   			 String command = str.substring(1); //cut the x for formatting
          debug_println(F("\tEMS_CMD: Converted command: "));
          debug_println(command);
-//         Serial.write("received! \n");
   			 emsSystem.doCommand(&command);
+         Serial.write("received! 5 \n");
   
   		}
   	}

@@ -4,20 +4,17 @@ import math
 import pygame
 import time
 import xlsxwriter
-import csv
+import random
 
 
 
 def play_rhythm(bluetooth, actual_stim_length, rhythm_substr, repeats, bpm, intensity_level):
     
     max_bpm = math.floor(30000/actual_stim_length) #how many eighthnote pulses could you fit into a minute without overlapping?
-    audio_repeats = 2
 
     if (bpm > max_bpm):
         print("max metronome bpm is " + str(max_bpm))
         return
-    if delay_val > actual_stim_length:
-        print("delay_value more than stim length")
 
     #determine pulse+wait length
     milliseconds_per_eighthnote = 30000/bpm
@@ -76,31 +73,61 @@ data_header = ["y ax = intensities (%, " + max_ems_stim_intensity + " is max on 
 ### open workbook, define worksheets ###
 
 workbook = xlsxwriter.Workbook(subject_name + '.xlsx')
+bold = workbook.add_format({'bold': True})
 pain_worksheet = workbook.add_worksheet("Pain level") # judged subjectively, 1-10, 1 is barely perceivable sensation, 10 is intense pain, 0 is no sensation.
 act_worksheet = workbook.add_worksheet("Actuation level") # judged subjectively, 1-10, 1 is barely visible movement, 10 is complete flexion. 0 is no visible actuation.
 speed_worksheet = workbook.add_worksheet("Actuation speed") # judged subjectively, 1-10, 1 is very slow, 10 is very fast. 0 is no actuation.
 worksheets = [pain_worksheet, act_worksheet, speed_worksheet]
 
+
+
 ## write header values ##
+
+for worksheet in worksheets:
+    for i in range(len(label_header)):
+        worksheet.write(0, i, label_header[i], bold) # write in header values
+        worksheet.write(1, i, header_values[i], bold)
+
+    for i in range(len(data_header)):
+        worksheet.write(2, data_header[i], bold)
+    for i in range(len(intensities)):
+        worksheet.write(i+2, 0, intensities[i], bold)
+
+
+worksheet_data_begin_indices = [3, 1] # where empty data space begins in each worksheet
+
+## scramble length and intensity test order ##
+
+x = list(enumerate(lengths))
+random.shuffle(x)
+shuffled_length_indices, shuffled_lengths = zip(*x)
+
+y = list(enumerate(intensities))
+random.shuffle(y)
+shuffled_intensity_indices, shuffled_intensities = zip(*y)
 
 
 ### run testing loop ###
 
+for i in range(len(shuffled_lengths)):
+    actual_stim_length = shuffled_lengths[i] #ms
+    data_index_x =shuffled_length_indices[i]
+    for j in range(len(shuffled_intensities)):
+        actual_intensity = shuffled_intensities[j]
+        data_index_y = shuffled_intensity_indices[j]
 
-for length in lengths:
-    actual_stim_length = length #ms
-    for intensity in intensities:
-        print(" Length: "+ str(length) + ", intensity: " + str(intensity))
-        out = input("Recorded prev values? Changed intensity?")
-        if out == "stop":
-            
-        else:
-            play_rhythm(bluetooth, actual_stim_length, rhythm_substr, repeats, bpm, intensity_level)
+        # print(" Length: "+ str(length) + ", intensity: " + str(intensity))
+        play_rhythm(bluetooth, actual_stim_length, rhythm_substr, repeats, bpm, actual_intensity)
+        pain_val = input("pain? 0-10")
+        actuation_val = input("actuation? 0-10")
+        speed_val = input("speed? 0-10")
+        values_to_write = [pain_val, actuation_val, speed_val]
+
+        for k in range(len(worksheets)):
+            worksheets[k].write(data_index_y, data_index_x, values_to_write[k])
+
         
-
-
-data = 
-
+### visualize as heat map at the end ###
 
 bluetooth.close()
 print("done")
