@@ -21,6 +21,7 @@
 
 #include "EMSSystem.h"
 
+
 EMSSystem::EMSSystem(uint8_t channels) {
 	emsChannels = (EMSChannel**) malloc(channels * sizeof(EMSChannel*));
 	maximum_channel_count = channels;
@@ -59,6 +60,8 @@ int EMSSystem::getNextNumberOfString(String *command, uint8_t startIndex) {
 }
 
 void EMSSystem::doActionCommand(String *command) {
+//  Serial.println("do action command");
+  Serial.flush();
 	int seperatorChannel = -1;
 	int seperatorSignalLength = -1;
 	int seperatorSignalIntensity = -1;
@@ -72,8 +75,8 @@ void EMSSystem::doActionCommand(String *command) {
 		if (seperatorChannel != -1) {
 
 			currentChannel = getNextNumberOfString(command, seperatorChannel);
-			Serial.print("Channel ");
-			Serial.println(currentChannel);
+//			Serial.print("Channel ");
+//			Serial.println(currentChannel);
 		}
     else {
       Serial.println("no channel...");
@@ -90,8 +93,8 @@ void EMSSystem::doActionCommand(String *command) {
 				signalLength = 5000;
 			}
 			emsChannels[currentChannel]->setSignalLength(signalLength);
-      Serial.print("signalLength ");
-      Serial.println(signalLength);
+//      Serial.print("signalLength ");
+//      Serial.println(signalLength);
 		}
     else {
        Serial.println("no length...");
@@ -104,8 +107,8 @@ void EMSSystem::doActionCommand(String *command) {
 			signalIntensity = getNextNumberOfString(command,
 					seperatorSignalIntensity);
 			emsChannels[currentChannel]->setIntensity(signalIntensity - 1);
-      Serial.print("intensity ");
-      Serial.println(signalIntensity);
+//      Serial.print("intensity ");
+//      Serial.println(signalIntensity);
 		}
     else {
       Serial.println("no intensity...");
@@ -119,10 +122,12 @@ void EMSSystem::doActionCommand(String *command) {
 //		}
 
 		if (currentChannel >= 0 && currentChannel < current_channel_count) {
-      Serial.write("activating \n ");
+      Serial.println("activating");
+      Serial.flush();
 			emsChannels[currentChannel]->activate();
 			emsChannels[currentChannel]->applySignal();
-      Serial.write("applied \n");
+      Serial.println("applied \n");
+      Serial.flush();
 		} else {
 			//deactivate all channels if channelNumber is wrong
 			shutDown();
@@ -203,6 +208,7 @@ uint8_t EMSSystem::check() {
 }
 
 void EMSSystem::doCommand(String *command) {
+  
 	if (command->length() > 0) {
 		if (command->indexOf(ACTION) != -1) {
 			doActionCommand(command);

@@ -16,36 +16,37 @@ bluetooth.write(b"2")
 while(bluetooth.in_waiting):
     print(bluetooth.readline().decode("utf-8"))
 
-def pingtest():
-    bluetooth.write(b"xC1I100T50G")
-    time.sleep(3)
 
-    tic = time.time()
-    tac = time.time()
-    diff = tac-tic
+
+def pingtest():
+    bluetooth.write(b"xC1I100T50G") # send initial command
+    time.sleep(2)
+
     act_lists = []
     std_dvs = []
     means = []
-    time_delays = [ 0.7, 0.6, 0.5, 0.4, 0.3]
-    print(diff)
+    time_delays = [0.7, 0.6, 0.5, 0.4, 0.3]
+
     for j in time_delays:
         act_list = []
         for i in range(30):
             tic = time.time()
             bluetooth.write(b"xG")
-            bluetooth.readline()
-            toc = time.time()
-            bluetooth.readline()
-            tac = time.time()
+            # bluetooth.readline()
+            # toc = time.time()
+            # bluetooth.readline()
+            # tac = time.time()
             bluetooth.readline()
             tuc = time.time()
             time.sleep(j)
-            elapsed_to_received = toc-tic
-            elapsed_to_activated = tac-tic
+            # elapsed_to_received = toc-tic
+            # elapsed_to_activated = tac-tic
             elapsed_to_applied = tuc-tic
             act_list.append(elapsed_to_applied)
 
-            print("elapsed to received: " + str(elapsed_to_received) + ", to activated: " +str (elapsed_to_activated)+ ", to applied: " + str(elapsed_to_applied))
+            # print("elapsed to received: " + str(elapsed_to_received) + ", to activated: " + str (elapsed_to_activated)+ ", to applied: " + str(elapsed_to_applied))
+            print("to applied: " + str(elapsed_to_applied))
+            
             # time.sleep(0.2)
         print("delay: " +str(j) + ", average activated lag: " + str(sum(act_list)/len(act_list)))
         act_lists.append(act_list)

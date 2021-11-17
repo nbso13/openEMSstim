@@ -8,7 +8,21 @@ import datetime
 import serial
 import time
 
+LENGTH_BEGIN = 140
+LENGTH_END = 300
+LENGTH_STEP = 20
+INTENSITY_BEGIN = 50
+INTENSITY_END = 95
+INTENSITY_STEP = 5
+BPM = 70
+BAUD_RATE = 115200
+REPEATS = 1
+RHYTH_STR = "101010"
+PARTICIPANT_NUMBERS = [0, 1]
 
+
+# notes: we need to think about where we're actuating the muscle along its length - there is a standard for electrode placement. Talk to 
+# Lewis about this. This already exists. Jakob might know about this. Probably will.
 
 
 def play_rhythm(bluetooth, actual_stim_length, rhythm_substr, repeats, bpm, intensity_level):
@@ -20,13 +34,13 @@ def play_rhythm(bluetooth, actual_stim_length, rhythm_substr, repeats, bpm, inte
         return
 
     #determine pulse+wait length
-    milliseconds_per_eighthnote = 30000/bpm
+    milliseconds_per_eighthnote = 30000/bpm # if you think about it this math works
     milliseconds_wait = milliseconds_per_eighthnote - actual_stim_length
 
     for i in range(repeats): # present the rhythm with appropriate number of repeats
         for j in range(len(rhythm_substr)):  # go through each eighthnote in the pattern
             if (rhythm_substr[j] == '1'): # this is a note
-                command_bytes = "xC1I" + str(intensity_level) + "T" + str(actual_stim_length) + "G"
+                command_bytes = "xC0I" + str(intensity_level) + "T" + str(actual_stim_length) + "G \n"
                 byt_com = bytes(command_bytes, encoding='utf8')
                 bluetooth.write(byt_com)
                 print("stim on")
@@ -43,17 +57,41 @@ def play_rhythm(bluetooth, actual_stim_length, rhythm_substr, repeats, bpm, inte
 
 # port = '/dev/ttys000'
 port = '/dev/tty.usbserial-18DNB483'
-bluetooth = serial.Serial(port, 115200)
+bluetooth = serial.Serial(port, BAUD_RATE)
 bluetooth.flushInput()
 bluetooth.write(b"2")
 
-input("adjust ems channel intensity to 10!")
+input("adjust ems channel intensity to 8!") #my max was16
+
+lengths = range(LENGTH_BEGIN, LENGTH_END, LENGTH_STEP) #length in ms of stimulation pulse -- watch out for mystery numbers - using 130 to 290 as range -- 130 being minimum length of stim and 290 as max necessary for low intensity
+# perhaps better to set up a 'settings file'
+ # make it global variables
+intensities = range(INTENSITY_BEGIN, INTENSITY_END, INTENSITY_STEP) 
+
+rhythm_substr = RHYTH_STR
+repeats = REPEATS
+bpm = BPM
 
 
+### calibrate user to strongest impulses ###
+input("For your reference: this is strongest and longest stim: (enter to play it) - let's determine how high we can set the ems")
+keep_going = True
+while keep_going:
+    play_rhythm(bluetooth, lengths[-1], rhythm_substr, repeats, bpm, intensities[-1]) # revisit this with Lewis, bring back to group to discuss re procedure
+    result = input("IF: 'I can go higher. I've upped the stim max on stimulator. Let's go again.' type y. IF: 'I can go no further!! It hurts a lot.' type n.")
+    if result == "n":
+        keep_going = False
+
+
+input("By contrast, this is weakest and shortest stim: (enter to play it)")
+play_rhythm(bluetooth, lengths[0], rhythm_substr, repeats, bpm, intensities[0])
 
 ### Gathering subject info ###
 
-subject_name = input("subject name?")
+participant_number = input("participant number?")
+if not participant_number in PARTICIPANT_NUMBERS:
+    participant_number = PARTICIPANT_NUMBERS[-1]+1
+    PARTICIPANT_NUMBERS.append(participant_number)
 now = datetime.datetime.now()
 test_time = now.strftime("%Y_%m_%d_%H_%M_%S")
 subject_arm = input("subject arm?")
@@ -62,21 +100,15 @@ max_ems_stim_intensity = input("max ems stim intensity?")
 pulse_width = input("pulse width?")
 pulse_frequency = input("frequency?") #these may be found on the stimulator and are not usually iterated on (using lit values)
 
-rhythm_substr = "10101010"
-repeats = 1
-bpm = 100
 
-lengths = range(150, 290, 20) #length in ms of stimulation pulse
-intensities = range(20, 100, 10) 
-
-label_header = ["subject name", "test time", "subject arm", "electrode config", "rhythm pattern", "bpm", "max_stim_intensity", "pulse width (microsecs)", "frequency (Hz)"]
-header_values = [subject_name, test_time, subject_arm, electrode_config, rhythm_substr, bpm, max_ems_stim_intensity, pulse_width, pulse_frequency]
+label_header = ["pp number and random seed", "test time", "subject arm", "electrode config", "rhythm pattern", "bpm", "max_stim_intensity", "pulse width (microsecs)", "frequency (Hz)"]
+header_values = [participant_number, test_time, subject_arm, electrode_config, rhythm_substr, bpm, max_ems_stim_intensity, pulse_width, pulse_frequency]
 data_header = ["y ax = intensities (%, " + max_ems_stim_intensity + " is max on toolkit stim), x ax = stim lengths (microsecs)"] + [*lengths]
 
  
 ### open workbook, define worksheets ###
 
-workbook = xlsxwriter.Workbook(test_time + '_' + subject_name + '.xlsx')
+workbook = xlsxwriter.Workbook(test_time + '_' +  "pp" + str(participant_number) + '.xlsx')
 bold = workbook.add_format({'bold': True})
 pain_worksheet = workbook.add_worksheet("Pain level") # judged subjectively, 1-10, 1 is barely perceivable sensation, 10 is intense pain, 0 is no sensation.
 act_worksheet = workbook.add_worksheet("Actuation level") # judged subjectively, 1-10, 1 is barely visible movement, 10 is complete flexion. 0 is no visible actuation.
@@ -98,27 +130,27 @@ for worksheet in worksheets:
 # workbook.close()
 worksheet_data_begin_indices = [3, 1] # where empty data space begins in each worksheet
 
+
 ## scramble length and intensity test order ##
 
-x = list(enumerate(lengths))
-random.shuffle(x)
-shuffled_length_indices, shuffled_lengths = zip(*x)
+# NOTE FROM MATTI: use a random seed for reproducibility - maybe everyone gets a different permutation - same seed but different permutations for each participant
+## Discuss this more with lewis - how often do we sample? Does it make sense to do this this way?
+# talk to Fiona and Jesse re IRB.
 
-y = list(enumerate(intensities))
-random.shuffle(y)
-shuffled_intensity_indices, shuffled_intensities = zip(*y)
+np.random.seed(participant_number)
+shuffled_lengths = np.random.permutation(lengths)
+np.random.seed(participant_number)
+shuffled_length_indices= np.random.permutation(np.arange(len(lengths)))
+
+np.random.seed(participant_number)
+shuffled_intensities = np.random.permutation(intensities)
+np.random.seed(participant_number)
+shuffled_intensity_indices= np.random.permutation(np.arange(len(intensities)))
 
 arr = np.empty((len(intensities), len(lengths)))
 arr[:] = np.NaN
 data_arr = [arr, arr, arr]
 
-### calibrate user to strongest impulses ###
-input("For your reference: this is strongest and longest stim: (enter to play it)")
-play_rhythm(bluetooth, lengths[-1], rhythm_substr, repeats, bpm, intensities[-1])
-
-input("By contrast, this is weakest and shortest stim: (enter to play it)")
-play_rhythm(bluetooth, lengths[0], rhythm_substr, repeats, bpm, intensities[0])
-input("If the first stim was unbearably painful and you cannot stand more stims of the sort, please press 'control C' on Mac to end program and reset max intensity and length as needed. Otherwise, 'enter' to continue.")
 
 ### run testing loop ###
 
@@ -127,19 +159,31 @@ input("You are to rate: (1) the pain of the stimulation (0 is no sensation, 10 i
 input("(2) the extent to which your finger moved, i.e., 'actuation' (0 is no movement, 10 is the extent to which it moved on the example), (enter to continue)")
 input("(3) the speed of actuation (0 is no movement, 1 is very slow, 10 is almost instantaneous activation) (enter to begin trials)")
 
+n = 0
 for i in range(len(shuffled_lengths)):
     actual_stim_length = shuffled_lengths[i] #ms
     data_index_x =shuffled_length_indices[i]
     for j in range(len(shuffled_intensities)):
+        n = n +1
         actual_intensity = shuffled_intensities[j]
         data_index_y = shuffled_intensity_indices[j]
 
-        print(" Length: "+ str(actual_stim_length) + ", intensity: " + str(actual_intensity))
+        #print(" Length: "+ str(actual_stim_length) + ", intensity: " + str(actual_intensity))
         play_rhythm(bluetooth, actual_stim_length, rhythm_substr, repeats, bpm, actual_intensity)
-        pain_val = input("pain? 0-10")
-        actuation_val = input("actuation? 0-10")
-        speed_val = input("speed? 0-10")
-        values_to_write = [pain_val, actuation_val, speed_val]
+        print(str(n) + "of "+str(len(lengths)*len(intensities)))
+        pain_val = input("pain? 0-10: ")
+        actuation_val = input("actuation? 0-10: ")
+        speed_val = input("speed? 0-10: ")
+        try:
+            values_to_write = [float(pain_val), float(actuation_val), float(speed_val)]
+        except ValueError:
+            print("You must enter some real value between [0 and 10] for each question.")
+            pain_val = input("pain? 0-10: ")
+            actuation_val = input("actuation? 0-10: ")
+            speed_val = input("speed? 0-10: ")
+            values_to_write = [float(pain_val), float(actuation_val), float(speed_val)]
+
+
 
         for k in range(len(worksheets)):
             try_again = False
@@ -161,28 +205,42 @@ for i in range(len(shuffled_lengths)):
                 worksheets[k].write(worksheet_data_begin_indices[0] + data_index_y, worksheet_data_begin_indices[1] + data_index_x, values_to_write[k])
                 data_arr[k][data_index_y, data_index_x] = values_to_write[k]
 
+workbook.close()
+
 ### visualize as heat map at the end ###
+len_labs = []
+for i in lengths:
+    len_labs.append(str(i))
+int_labs = []
+for i in intensities:
+    int_labs.append(str(i))
 
 fig, axs = plt.subplots(2, 2)
-axs[0, 0].imshow(data_arr[1], cmap='hot', interpolation='nearest')
+axs[0, 0].imshow(data_arr[0], cmap='hot', interpolation='nearest')
 axs[0, 0].set_title('Pain map')
-axs[0, 0].set_xticklabels(lengths) 
-axs[0, 0].set_yticklabels(intensities) 
-axs[0, 1].imshow(data_arr[2], cmap='hot', interpolation='nearest')
+axs[0, 1].imshow(data_arr[1], cmap='hot', interpolation='nearest')
 axs[0, 1].set_title('Actuation map')
-axs[0, 1].set_xticklabels(lengths) 
-axs[0, 1].set_yticklabels(intensities)
-axs[1, 0].imshow(data_arr[3], cmap='hot', interpolation='nearest')
+axs[1, 0].imshow(data_arr[2], cmap='hot', interpolation='nearest')
 axs[1, 0].set_title('Speed map')
-axs[1, 0].set_xticklabels(lengths) 
-axs[1, 0].set_yticklabels(intensities)
 
 for ax in axs.flat:
     ax.set(xlabel='Stim length (ms)', ylabel='Stim intensity (%)')
+    ax.set_xticklabels(len_labs) 
+    ax.set_yticklabels(int_labs)
 
+plt.show()
+
+# calibration index
+index_map = np.subtract(np.add(data_arr[1],data_arr[2]), 1.5*data_arr[0])
+
+fig, axs = plt.subplots()
+axs.imshow(index_map, cmap='hot', interpolation='nearest')
+axs[0, 0].set_title('Index Map')
+ax.set(xlabel='Stim length (ms)', ylabel='Stim intensity (%)')
+
+ax.set_xticklabels(len_labs) 
+ax.set_yticklabels(int_labs)
 plt.show()
 
 bluetooth.close()
 print("done")
-
-workbook.close()

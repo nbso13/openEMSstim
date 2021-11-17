@@ -43,7 +43,6 @@ EMSChannel emsChannel2(6, 7, A3, &digitalPot, 3);
 EMSSystem emsSystem(2);
 
 String command = "";
-
 void setup() {
 	Serial.begin(115200);
 
@@ -104,17 +103,17 @@ void loop() {
 				}
 			}
 
-			if(command.charAt(0) != 'x') { // if string does not begin with x, this is a debug format str
-          debug_println(F("\tEMS_CMD: 1 Converted command: "));
-          debug_println(command);
-          debug_Toolkit(command);
-        } 
-       else { //then this is properly formatted command
-         String command_str = command.substring(1); //cut the x for formatting
-         debug_println(F("\tEMS_CMD: 2 Converted command: "));
-         debug_println(command_str);
-         emsSystem.doCommand(&command_str);
-      }
+//			if(command.charAt(0) != 'x') { // if string does not begin with x, this is a debug format str
+//          debug_println(F("\tEMS_CMD: 1 Converted command: "));
+//          debug_println(command);
+//          debug_Toolkit(command);
+//        } 
+//       else { //then this is properly formatted command
+       String command_str = command.substring(1); //cut the x for formatting
+       debug_println(F("\tEMS_CMD: 2 Converted command: "));
+       debug_println(command_str);
+       emsSystem.doCommand(&command_str);
+//      }
 
 			command = "";
 		} else if (notification.equals(BTLE_DISCONNECT)) {
@@ -131,22 +130,30 @@ void loop() {
 
    if (ACCEPT_USB_COMMANDS) {
       if (Serial.available() > 0) {
-        Serial.write("received! \n");
+        
+        debug_println("received!"); 
+//        float time1 = millis();
         String str = Serial.readStringUntil('\n');
-        Serial.write("received! 2 \n");
-        debug_println(str); 
-        Serial.write("received! 3 \n");
-        if(str.charAt(0) != 'x') { // if string does not begin with x, this is a debug format str
-          debug_Toolkit(str);
-        } else { //then this is properly formatted command
-         Serial.write("received! 4 \n");
-  			 String command = str.substring(1); //cut the x for formatting
-         debug_println(F("\tEMS_CMD: Converted command: "));
-         debug_println(command);
-  			 emsSystem.doCommand(&command);
-         Serial.write("received! 5 \n");
+//        Serial.write("received! 2 \n");
+//        debug_println(str); 
+//        Serial.write("received! 3 \n");
+//        if(str.charAt(0) != 'x') { // if string does not begin with x, this is a debug format str
+//          debug_Toolkit(str);
+//        } else { //then this is properly formatted command
+//         Serial.write("received! 4 \n");
+  			 String command = str; //cut the x for formatting
+//         debug_println(F("\tEMS_CMD: Converted command: "));
+//         debug_println(command);
+
+//         float time2 = millis();
+          debug_println("act_command");
+  			  emsSystem.doCommand(&command);
+          debug_println("done");
+//         float time_between = time2-time1;
+//         char buff[10];
+//         debug_println(itoa(time_between, buff, 10));
   
-  		}
+//  		}
   	}
   
   }
