@@ -2,23 +2,24 @@ import numpy as np
 import math
 import time
 import xlsxwriter
-import random
 import matplotlib.pyplot as plt
 import datetime
 import serial
 import time
 
-LENGTH_BEGIN = 140
-LENGTH_END = 300
-LENGTH_STEP = 20
-INTENSITY_BEGIN = 50
-INTENSITY_END = 95
+LENGTH_BEGIN = 165
+LENGTH_END = 270
+LENGTH_STEP = 15
+INTENSITY_BEGIN = 60
+INTENSITY_END = 100
 INTENSITY_STEP = 5
 BPM = 70
 BAUD_RATE = 115200
 REPEATS = 1
 RHYTH_STR = "101010"
 PARTICIPANT_NUMBERS = [0, 1]
+
+# initial results indicate that after finding max level they can take with this max length, max stim length
 
 
 # notes: we need to think about where we're actuating the muscle along its length - there is a standard for electrode placement. Talk to 
@@ -40,7 +41,7 @@ def play_rhythm(bluetooth, actual_stim_length, rhythm_substr, repeats, bpm, inte
     for i in range(repeats): # present the rhythm with appropriate number of repeats
         for j in range(len(rhythm_substr)):  # go through each eighthnote in the pattern
             if (rhythm_substr[j] == '1'): # this is a note
-                command_bytes = "xC0I" + str(intensity_level) + "T" + str(actual_stim_length) + "G \n"
+                command_bytes = "xC1I" + str(intensity_level) + "T" + str(actual_stim_length) + "G \n"
                 byt_com = bytes(command_bytes, encoding='utf8')
                 bluetooth.write(byt_com)
                 print("stim on")
@@ -137,15 +138,34 @@ worksheet_data_begin_indices = [3, 1] # where empty data space begins in each wo
 ## Discuss this more with lewis - how often do we sample? Does it make sense to do this this way?
 # talk to Fiona and Jesse re IRB.
 
-np.random.seed(participant_number)
-shuffled_lengths = np.random.permutation(lengths)
-np.random.seed(participant_number)
-shuffled_length_indices= np.random.permutation(np.arange(len(lengths)))
+lens = np.array(lengths) 
+len_inds = np.arange(len(lengths))
+big_lens = np.tile(lens, len(intensities)) # repeat len array
+big_lens_inds = np.tile(len_inds, len(intensities)) # do the same for len_indices
+
+intents = np.array(intensities)
+int_inds = np.arange(len(intensities))
+big_ints = np.repeat(intents, len(lens))
+big_ints_inds = np.repeat(int_inds, len(lens)) # repeat individual elements of intensities and same for inds
+
+param_array = np.vstack([big_lens, big_ints])
+param_inds_array = np.vstack([big_lens_inds, big_ints_inds]) #concatenate them
 
 np.random.seed(participant_number)
-shuffled_intensities = np.random.permutation(intensities)
+shuffled_vals = np.transpose(np.random.permutation(np.transpose(param_array))) #randomly permute all indices
 np.random.seed(participant_number)
-shuffled_intensity_indices= np.random.permutation(np.arange(len(intensities)))
+shuffled_inds = np.transpose(np.random.permutation(np.transpose(param_inds_array)))
+
+
+# np.random.seed(participant_number)
+# shuffled_lengths = np.random.permutation(lengths)
+# np.random.seed(participant_number)
+# shuffled_length_indices= np.random.permutation(np.arange(len(lengths)))
+
+# np.random.seed(participant_number)
+# shuffled_intensities = np.random.permutation(intensities)
+# np.random.seed(participant_number)
+# shuffled_intensity_indices= np.random.permutation(np.arange(len(intensities)))
 
 arr = np.empty((len(intensities), len(lengths)))
 arr[:] = np.NaN
@@ -160,52 +180,61 @@ input("(2) the extent to which your finger moved, i.e., 'actuation' (0 is no mov
 input("(3) the speed of actuation (0 is no movement, 1 is very slow, 10 is almost instantaneous activation) (enter to begin trials)")
 
 n = 0
-for i in range(len(shuffled_lengths)):
-    actual_stim_length = shuffled_lengths[i] #ms
-    data_index_x =shuffled_length_indices[i]
-    for j in range(len(shuffled_intensities)):
-        n = n +1
-        actual_intensity = shuffled_intensities[j]
-        data_index_y = shuffled_intensity_indices[j]
+for i in range(len(shuffled_vals[0])): # go through whole list of shuffled values
+    n = n +1
+    actual_stim_length = shuffled_vals[0][i] #ms
+    data_index_x = shuffled_inds[0][i]
+    actual_intensity = shuffled_vals[1][i]
+    data_index_y = shuffled_inds[1][i]
 
-        #print(" Length: "+ str(actual_stim_length) + ", intensity: " + str(actual_intensity))
-        play_rhythm(bluetooth, actual_stim_length, rhythm_substr, repeats, bpm, actual_intensity)
-        print(str(n) + "of "+str(len(lengths)*len(intensities)))
+    #print(" Length: "+ str(actual_stim_length) + ", intensity: " + str(actual_intensity))
+    play_rhythm(bluetooth, actual_stim_length, rhythm_substr, repeats, bpm, actual_intensity)
+    print(str(n) + " of "+ str(len(lengths)*len(intensities)))
+    pain_val = input("pain? 0-10: ")
+    actuation_val = input("actuation? 0-10: ")
+    speed_val = input("speed? 0-10: ")
+    try:
+        values_to_write = [float(pain_val), float(actuation_val), float(speed_val)]
+    except ValueError:
+        print("You must enter some real value between [0 and 10] for each question.")
         pain_val = input("pain? 0-10: ")
         actuation_val = input("actuation? 0-10: ")
         speed_val = input("speed? 0-10: ")
+        values_to_write = [float(pain_val), float(actuation_val), float(speed_val)]
+
+
+
+    for k in range(len(worksheets)): # writing
+        try_again = False
+        worksheets[k].write(worksheet_data_begin_indices[0] + data_index_y, worksheet_data_begin_indices[1] + data_index_x, values_to_write[k])
         try:
-            values_to_write = [float(pain_val), float(actuation_val), float(speed_val)]
+            data_arr[k][data_index_y, data_index_x] = values_to_write[k]
         except ValueError:
-            print("You must enter some real value between [0 and 10] for each question.")
-            pain_val = input("pain? 0-10: ")
-            actuation_val = input("actuation? 0-10: ")
-            speed_val = input("speed? 0-10: ")
-            values_to_write = [float(pain_val), float(actuation_val), float(speed_val)]
+            try_again = True
+            break
 
 
-
+    if(try_again == True or max(values_to_write) > 10 or min(values_to_write) < 0):
+        print("Please be sure to enter a value between 0 and 10 for each inquiry.")
+        pain_val = input("pain? 0-10")
+        actuation_val = input("actuation? 0-10")
+        speed_val = input("speed? 0-10")
+        values_to_write = [pain_val, actuation_val, speed_val]
         for k in range(len(worksheets)):
-            try_again = False
             worksheets[k].write(worksheet_data_begin_indices[0] + data_index_y, worksheet_data_begin_indices[1] + data_index_x, values_to_write[k])
-            try:
-                data_arr[k][data_index_y, data_index_x] = values_to_write[k]
-            except ValueError:
-                try_again = True
-                break
-
-
-        if(try_again == True or max(values_to_write) > 10 or min(values_to_write) < 0):
-            print("Please be sure to enter a value between 0 and 10 for each inquiry.")
-            pain_val = input("pain? 0-10")
-            actuation_val = input("actuation? 0-10")
-            speed_val = input("speed? 0-10")
-            values_to_write = [pain_val, actuation_val, speed_val]
-            for k in range(len(worksheets)):
-                worksheets[k].write(worksheet_data_begin_indices[0] + data_index_y, worksheet_data_begin_indices[1] + data_index_x, values_to_write[k])
-                data_arr[k][data_index_y, data_index_x] = values_to_write[k]
+            data_arr[k][data_index_y, data_index_x] = values_to_write[k]
 
 workbook.close()
+
+
+# calibration index
+
+data_arr[2] = np.abs(data_arr[2]-6) # distance from ideal actuation
+index_map = np.subtract(np.add(data_arr[1],2*data_arr[2]), 2*data_arr[0])
+
+bluetooth.close()
+print("done")
+
 
 ### visualize as heat map at the end ###
 len_labs = []
@@ -222,6 +251,8 @@ axs[0, 1].imshow(data_arr[1], cmap='hot', interpolation='nearest')
 axs[0, 1].set_title('Actuation map')
 axs[1, 0].imshow(data_arr[2], cmap='hot', interpolation='nearest')
 axs[1, 0].set_title('Speed map')
+axs[1,1].imshow(index_map, cmap='hot', interpolation='nearest')
+axs[1, 1].set_title('Index Map')
 
 for ax in axs.flat:
     ax.set(xlabel='Stim length (ms)', ylabel='Stim intensity (%)')
@@ -230,17 +261,3 @@ for ax in axs.flat:
 
 plt.show()
 
-# calibration index
-index_map = np.subtract(np.add(data_arr[1],data_arr[2]), 1.5*data_arr[0])
-
-fig, axs = plt.subplots()
-axs.imshow(index_map, cmap='hot', interpolation='nearest')
-axs[0, 0].set_title('Index Map')
-ax.set(xlabel='Stim length (ms)', ylabel='Stim intensity (%)')
-
-ax.set_xticklabels(len_labs) 
-ax.set_yticklabels(int_labs)
-plt.show()
-
-bluetooth.close()
-print("done")

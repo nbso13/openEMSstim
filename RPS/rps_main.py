@@ -2,12 +2,10 @@
 import subprocess
 import shlex
 import numpy as np
-import math
-import pygame
 import time
 import serial
 
-
+# FOR ROBUST POINTER AND MIDDLE ACUTATION - SEE PICTURE IN FOLDER. Use max strength stim for 175 ms. But be careful when adding in ring and pinky
 
 # port = '/dev/ttys000'
 port = '/dev/tty.usbserial-18DNB483'
@@ -49,15 +47,15 @@ listen(bluetooth)
 
 input("adjust ems channel intensity to 26!")
 
-leng = [210, 210] # stim len ms
+leng = [170, 175] # stim len ms
 stren = [87, 90]
 while True:
     out = input("comm?")
     execute(bluetooth, out, leng, stren)
     listen(bluetooth)
 beat = 0.6
-derlay = 0.1
-command_arr = ["rock", "paper", "scissors"]
+delay = 0.1
+command_arr = ["r", "p", "s"]
 num_trials = 10
 for i in range(num_trials):
     choice = np.random.randint(0,3)

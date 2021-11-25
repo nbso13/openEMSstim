@@ -63,14 +63,12 @@ def pingtest():
             act_list.append(elapsed_to_activated)
             # print("elapsed to received: " + str(elapsed_to_received) + ", to activated: " + str (elapsed_to_activated)+ ", to applied: " + str(elapsed_to_applied))
             print("to received: " + str(elapsed_to_received) + ", to act_com: " + str(elapsed_to_act_com) + ", to applied: " + str(elapsed_to_applied) + ", to activated: " + str(elapsed_to_activated))
-        print("delay: " +str(j) + ", average activated lag: " + str(sum(act_list)/len(act_list)))
+        # print("delay: " +str(j) + ", average activated lag: " + str(sum(act_list)/len(act_list)))
         act_lists.append(act_list)
         means.append(np.mean(np.array(act_list)))
         std_dvs.append(np.std(np.array(act_list)))
 
-    print(time_delays)
-    print(means)
-    print(std_dvs)
+    print("mean delay (seconds) +/- std (n=100): " + str(means[0]) + " +/- " + str(std_dvs[0]))
     return
 
 pingtest()
