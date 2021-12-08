@@ -1,6 +1,4 @@
 
-import subprocess
-import shlex
 import numpy as np
 import time
 import serial
