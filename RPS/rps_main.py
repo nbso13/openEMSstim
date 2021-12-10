@@ -45,8 +45,8 @@ listen(bluetooth)
 
 input("adjust ems channel intensity to 26!")
 
-leng = [170, 175] # stim len ms
-stren = [87, 90]
+leng = [165, 170] # stim len ms
+stren = [96, 96]
 while True:
     out = input("comm?")
     execute(bluetooth, out, leng, stren)
@@ -63,7 +63,7 @@ for i in range(num_trials):
     time.sleep(beat)
     print("schnack")
     time.sleep(beat)
-    print("schnook")
+    print("schnuck")
     time.sleep(beat-delay)
     execute(bluetooth, comm, leng, stren)
     

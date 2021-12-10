@@ -145,7 +145,6 @@ def run_rhythm_ems(rhythm_display_flag, ems_serial, time_naught, stim_onset_time
                     break
     # print("EMS THREAD: Beginning post display: time since start: " + str(time.time()-time_naught))
 
-
 def run_rhythm_audio(rhythm_display_flag, post_ems_test_flag, audio_onset_times, time_naught, repeats, rhythm_substr, \
     milliseconds_per_eighthnote, metronome_intro_flag, count_in_substr, audio_predisplay_flag, pre_repeats, post_ems_repeats):
     # runs audio.
@@ -471,7 +470,15 @@ def process_contact_trace_to_hit_times(contact_trace_array, x_values_array, thre
     time_points_out = time_points[nonsurpressedselector_bool]
     return time_points_out
 
-
+def test_double_stroke(ems_serial):
+    out = input("test double stroke sensation?")
+    if out == 'y':
+        contin = True
+        while contin:
+            test_double_stroke(ems_serial, ems_constants.actual_stim_length, ems_constants.bpm, ems_constants.double_stroke_rhythm)
+            out = input("adjust? a / continue? c")
+            if out == 'c':
+                contin = False
 
 # example: command_str = "C0I100T750G \n"
 
@@ -526,19 +533,13 @@ if __name__ == '__main__':
     #         print(int(out[:-2]))
 
     ### testing double stroke ###
-    out = input("test double stroke sensation?")
-    if out == 'y':
-        contin = True
-        while contin:
-            test_double_stroke(ems_serial, ems_constants.actual_stim_length, ems_constants.bpm, ems_constants.double_stroke_rhythm)
-            out = input("adjust? a / continue? c")
-            if out == 'c':
-                contin = False
+    test_double_stroke(ems_serial)
 
     ## zero
     sleep_len_ms = ems_constants.sleep_len * 1000
     baseline_mean, baseline_sd = zero_sensor(contact_serial, 3*sleep_len_ms, ems_constants.samp_period_ms)
 
+    delay_std = 0
 
     ### MEASURE DELAY \delay_val = MEASURED_DELAY # TUNE THIS TO KASAHARA RESPONSE TIME, GET RESULTS REGARDING AGENCY AND MEASURE TRAINING RESULT
     out = input("measure delay? 'y' to measure, enter number otherwise in milliseconds.")
@@ -560,11 +561,17 @@ if __name__ == '__main__':
             legend_labels = ["raw response trace", "stim trace",  "filtered response trace"]
             plot_contact_trace_and_rhythm(reading_results, contact_x_values, stim_trace, reaction_trace, x_vec,  \
             ems_constants.samp_period_ms, legend_labels)
-
-            out = input("Measured delay was "  + str(delay_mean) + " +/- " + str(delay_std) +  \
-                ". y to proceed, n to try again, control C to quit.")
+            
+            print("Measured delay was "  + str(delay_mean) + " +/- " + str(delay_std))
+            
+            out = input("recalibrate? y/n")
+            if out == 'y':
+                test_double_stroke(ems_serial)
+            
+            out = input("y to proceed, n to try again, control C to quit.")
             if out == 'y':
                 repeat_bool = False
+            
     else:
         delay_mean = int(out)
 
@@ -616,9 +623,11 @@ if __name__ == '__main__':
         ### SAVE DATA ###
 
         label_header = ["pp number", "test time", "subject arm", "electrode config", "rhythm pattern", \
-            "bpm", "max_stim_intensity", "pulse width (microsecs)", "frequency (Hz)", "measured delay mean", "pre-ems repeats", "with ems repeats", "post ems repeats"]
+            "bpm", "max_stim_intensity", "pulse width (microsecs)", "frequency (Hz)", "measured delay mean",  \
+                "measured delay std", "pre-ems repeats", "with ems repeats", "post ems repeats", "zeroed mean", "zeroed sd"]
         header_values = [participant_number, test_time, subject_arm, electrode_config, rhythm_substr, \
-            ems_constants.bpm, max_ems_stim_intensity, pulse_width, pulse_frequency, MEASURED_DELAY, ems_constants.audio_repeats, ems_constants.repeats, ems_constants.post_ems_repeats]
+            ems_constants.bpm, max_ems_stim_intensity, pulse_width, pulse_frequency, MEASURED_DELAY, delay_std, \
+                ems_constants.audio_repeats, ems_constants.repeats, ems_constants.post_ems_repeats, baseline_mean, baseline_sd]
         data_header = ["time values (ms)", "contact trace", "stim time onsets", "audio time onsets"]
 
         

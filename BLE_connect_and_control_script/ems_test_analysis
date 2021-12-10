@@ -12,6 +12,8 @@ import glob
 import quantities as pq
 from elephant.spike_train_dissimilarity import victor_purpura_distance
 from neo import SpikeTrain
+import scipy
+
 
 def victor_purp(onset_times_1, onset_times_2, loop_begin, loop_end):
     q = 1.0 / (10.0 * pq.ms)
@@ -22,21 +24,20 @@ def victor_purp(onset_times_1, onset_times_2, loop_begin, loop_end):
 
 # TEST THIS FUNCTION
 def compile_unique_interval_list(intervals, tolerance):
+    interval_index_lib = np.arange(0, len(intervals))
     unique_interval_list = []
     index = 0
     indices = []
     for interval in intervals: # for every interval
-        index = index + 1
         # if this interval is within tolerance of any item on the list,
         bool_list = [(interval+tolerance > item and interval-tolerance < item) for item in unique_interval_list]
-        if bool_list.any():
+        if any(bool_list):
+            indices.append(bool_list.index(True))
             continue # we consider it on the list.
         else: #otherwise
             unique_interval_list.append(interval) # add it to list
-            indices.append(index)
+            indices.append(len(unique_interval_list) - 1)
     return unique_interval_list, indices
-
-
 
 xlsxfiles = []
 for file in glob.glob("*.xlsx"):
@@ -104,7 +105,7 @@ for i in range(len(ems_constants.rhythm_strings)):
 
     legend_labels = ["contact trace", "stim trace", "audio trace"]
 
-    # plot_contact_trace_and_rhythm(reading_list, contact_x_values, stim_trace, audio_trace, x_vec, ems_constants.samp_period_ms, legend_labels)
+    plot_contact_trace_and_rhythm(reading_list, contact_x_values, stim_trace, audio_trace, x_vec, ems_constants.samp_period_ms, legend_labels)
 
     surpressed_contact_onset_times = process_contact_trace_to_hit_times(reading_list, contact_x_values, ems_constants.baseline_subtractor, ems_constants.surpression_window)
 
@@ -113,7 +114,7 @@ for i in range(len(ems_constants.rhythm_strings)):
 
     legend_labels = ["surpressed contact trace", "stim trace", "audio trace"]
 
-    # plot_contact_trace_and_rhythm(surpressed_contact_trace, x_vec, stim_trace, audio_trace, x_vec, ems_constants.samp_period_ms, legend_labels)
+    plot_contact_trace_and_rhythm(surpressed_contact_trace, x_vec, stim_trace, audio_trace, x_vec, ems_constants.samp_period_ms, legend_labels)
 
     var_list = [contact_x_values, reading_list, stim_onset_times, audio_onset_times, x_vec, stim_trace, audio_trace, surpressed_contact_onset_times, surpressed_contact_trace]
     list_of_var_lists.append(var_list)
@@ -127,7 +128,7 @@ for i in range(len(ems_constants.rhythm_strings)):
     len_count_off_and_audio_display_ms = len_count_off_ms + pre_ems_repeats * len_rhythm_ms
     len_count_off_and_audio_display_and_ems_ms = len_count_off_ms + pre_ems_repeats *len_rhythm_ms + with_ems_repeats * len_rhythm_ms
 
-    delays_list = [len_count_off_ms, len_count_off_and_audio_display_ms, len_count_off_and_audio_display_and_ems_ms]
+    delays_list = [len_count_off_ms, len_count_off_and_audio_display_ms, len_count_off_and_audio_display_and_ems_ms, max(contact_x_values)]
     audio_repeats_distances = []
     ems_repeats_distances = []
     post_ems_repeats_distances = []
@@ -185,7 +186,7 @@ for i in range(len(ems_constants.rhythm_strings)):
         ground_truth_intervals = []
         user_intervals = []
         user_error = []
-        this_condition_bools = np.logical_and((audio_onset_times > delays_list[i]), (audio_onset_times < delays_list[i]))
+        this_condition_bools = np.logical_and((audio_onset_times > delays_list[i]), (audio_onset_times < delays_list[i+1]))
         condition_audio_onsets = audio_onset_times[this_condition_bools]
         for j in range(len(condition_audio_onsets)-1):
             gt_interval = condition_audio_onsets[j+1] - condition_audio_onsets[j]
@@ -205,6 +206,10 @@ print("done")
 
 # organize intervals
 
+slopes = []
+intercepts = []
+r_sqs = []
+
 # wing kris across rhythms for each condition
 for i in range(num_conditions):
     list_of_vars_for_condition = [] # first dim, len_rhythm_types long. second dim, ground truth, user, user_error.
@@ -220,12 +225,23 @@ for i in range(num_conditions):
         # now add it to the list of intervals produced for that target
         #within the list of unique intervals
         list_of_user_intervals_by_target_interval[target_interval_index].append(user_intervals_across_rhythms[k])
+    interval_means_list = [sum(item_list)/len(item_list) for item_list in list_of_user_intervals_by_target_interval]
+    interval_sd_list = [np.std(item_list) for item_list in list_of_user_intervals_by_target_interval]
+    slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(interval_means_list, interval_sd_list) 
+    rsq = r_value**2
+    slopes.append(slope)
+    intercepts.append(intercept)
+    r_sqs.append(rsq)
 
-# for each condition
-# for every interval size
-# calculate SD of response interval for each interval
-# linear regression to find slope and intercept and goodness of fit
-# # plot SD to mean interval with line
-# plot mean change in intercept over conditions
-# plot mean change in slope over conditions
-# plot goodness of fit over conditions
+fig, ax = plt.subplots()
+
+legend_labels = ["clock var", "motor var"]
+ax.plot(np.arange(len(slopes)), slopes/max(slopes))
+ax.plot(np.arange(len(intercepts)), intercepts/max(intercepts))
+ax.legend(label_list)
+
+ax.set_title("normalized variances for clock and motor across epochs")
+plt.ion()
+plt.show()
+plt.draw()
+plt.pause(0.01)
