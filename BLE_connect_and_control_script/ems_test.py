@@ -451,11 +451,6 @@ def test_double_stroke(ems_serial, actual_stim_length, bpm, double_stroke_rhythm
     run_rhythm_ems(rhythm_display_flag, ems_serial, temp, [], reps, double_stroke_rhythm, actual_stim_length,  \
         milliseconds_per_eighthnote, metronome, [], audio_pre_display_flag, pre_repeats)
 
-def earth_movers_distance(rhythm_trace_a, rhythm_trace_b, rhythm_total_spike_times_a, rhythm_total_spike_times_b):
-    cumulative_a = np.cumsum(np.divide(rhythm_trace_a, rhythm_total_spike_times_a))
-    cumulative_b = np.cumsum(np.divide(rhythm_trace_b, rhythm_total_spike_times_b))
-    return np.sum(np.abs(cumulative_a, cumulative_b))
-
 def process_contact_trace_to_hit_times(contact_trace_array, x_values_array, threshold, surpression_window):
     bool_list = contact_trace_array > threshold # find indices of contact trace array that exceed threshold
     time_points = x_values_array[bool_list] # get the time points of those points in trace
@@ -641,8 +636,13 @@ if __name__ == '__main__':
             worksheet.write(1, i, header_values[i], bold)
 
         for i in range(len(data_header)):
-            worksheet.write(2, i, data_header[i])
+            worksheet.write(2, i, data_header[i], bold)
 
+        worksheet.write(0, i + 1, "all rhythm strings and names")
+        for i in range(len(ems_constants.rhythm_strings_names)):
+            ind = len(label_header) + 1 + i
+            worksheet.write(0, ind, ems_constants.rhythm_strings_names[i])
+            worksheet.write(1, ind, ems_constants.rhythm_strings[i])
         worksheet_data_begin_indices = [3, 0] # where empty data space begins in each worksheet
 
         arrs_to_write = [contact_x_values, reading_list, stim_onset_times, audio_onset_times]

@@ -7,7 +7,6 @@ from openpyxl import load_workbook
 from ems_test import spike_times_to_traces
 from ems_test import process_contact_trace_to_hit_times
 from ems_test import plot_contact_trace_and_rhythm
-from ems_test import earth_movers_distance
 import glob
 import quantities as pq
 from elephant.spike_train_dissimilarity import victor_purpura_distance
@@ -15,10 +14,33 @@ from neo import SpikeTrain
 import scipy
 
 
+def plot_traces(x_array, trace_list, samp_period, legend_labels, title):
+    fig, ax = plt.subplots()
+    
+    ax.set_yticks(np.arange(0, 500, 100))
+    ax.set_xticks(np.arange(0, (len(trace_list[0]) * samp_period), 10000))
+    ax.plot(x_array, trace_list[0])
+    for i in range(len(trace_list) - 1):
+        ax.plot(x_array, trace_list[i+1]*np.max(trace_list[0])/2)
+    ax.legend(legend_labels)
+    ax.set_title(title)
+    plt.ion()
+    plt.show()
+    plt.draw()
+    plt.pause(0.01)
+
+def earth_movers_distance(spike_times_a, spike_times_b, rhythm_trace_a, rhythm_trace_b):
+    rhythm_total_spike_times_a = len(spike_times_a)
+    rhythm_total_spike_times_b = len(spike_times_b)
+    cumulative_a = np.cumsum(np.divide(rhythm_trace_a, rhythm_total_spike_times_a))
+    cumulative_b = np.cumsum(np.divide(rhythm_trace_b, rhythm_total_spike_times_b))
+    # same thing as np.sum(np.abs(np.subtract(cumulative_a, cumulative_b))),
+    return  scipy.stats.wasserstein_distance(spike_times_a, spike_times_b)
+
 def victor_purp(onset_times_1, onset_times_2, loop_begin, loop_end):
     q = 1.0 / (10.0 * pq.ms)
-    st_a = SpikeTrain(onset_times_1, units='ms', t_start = loop_begin, t_stop= loop_end)
-    st_b = SpikeTrain(onset_times_2, units='ms', t_start = loop_begin, t_stop= loop_end)
+    st_a = SpikeTrain(onset_times_1, units='ms', t_start = 0, t_stop= loop_end-loop_begin)
+    st_b = SpikeTrain(onset_times_2, units='ms', t_start = 0, t_stop= loop_end-loop_begin)
     vp_f = victor_purpura_distance([st_a, st_b], q)[1][0] # give only the distance between the two different trains (not diagonal)
     return vp_f
 
@@ -105,7 +127,7 @@ for i in range(len(ems_constants.rhythm_strings)):
 
     legend_labels = ["contact trace", "stim trace", "audio trace"]
 
-    plot_contact_trace_and_rhythm(reading_list, contact_x_values, stim_trace, audio_trace, x_vec, ems_constants.samp_period_ms, legend_labels)
+    # plot_contact_trace_and_rhythm(reading_list, contact_x_values, stim_trace, audio_trace, x_vec, ems_constants.samp_period_ms, legend_labels)
 
     surpressed_contact_onset_times = process_contact_trace_to_hit_times(reading_list, contact_x_values, ems_constants.baseline_subtractor, ems_constants.surpression_window)
 
@@ -114,7 +136,8 @@ for i in range(len(ems_constants.rhythm_strings)):
 
     legend_labels = ["surpressed contact trace", "stim trace", "audio trace"]
 
-    plot_contact_trace_and_rhythm(surpressed_contact_trace, x_vec, stim_trace, audio_trace, x_vec, ems_constants.samp_period_ms, legend_labels)
+    # plot_traces(x_vec, [surpressed_contact_trace, audio_trace, stim_trace], ems_constants.samp_period_ms, legend_labels, ems_constants.rhythm_strings_names[i])
+    # plot_contact_trace_and_rhythm(surpressed_contact_trace, x_vec, stim_trace, audio_trace, x_vec, ems_constants.samp_period_ms, legend_labels)
 
     var_list = [contact_x_values, reading_list, stim_onset_times, audio_onset_times, x_vec, stim_trace, audio_trace, surpressed_contact_onset_times, surpressed_contact_trace]
     list_of_var_lists.append(var_list)
@@ -137,24 +160,36 @@ for i in range(len(ems_constants.rhythm_strings)):
     repeat_list = [pre_ems_repeats, with_ems_repeats, post_ems_repeats]
 
     # for each loop of rhythm, calculate EMD for contact trace vs real audio rhythm
+    # change to spikes
+    audio_trace_copy = np.copy(audio_trace)
+    for j in range(len(audio_trace)-1):
+        if audio_trace_copy[j] == 1:
+            audio_trace[j+1] = 0
+    
+    contact_trace_copy = np.copy(surpressed_contact_trace)
+    for j in range(len(surpressed_contact_trace)-1):
+        if contact_trace_copy[j] == 1:
+            surpressed_contact_trace[j+1] = 0
 
-    for i in range(num_conditions): # for each condition (audio only, ems and audio, post_ems audio only test)
-        for j in range(repeat_list[i]): # for each repeat of the rhythm in this condition
-            loop_begin = delays_list[i] + j * len_rhythm_ms - ems_constants.milliseconds_per_eighthnote #include one eighthnote before
-            loop_end = loop_begin + len_rhythm_ms + 2 * ems_constants.milliseconds_per_eighthnote #include one eighthnote after as well
+    for k in range(num_conditions): # for each condition (audio only, ems and audio, post_ems audio only test)
+        for j in range(repeat_list[k]): # for each repeat of the rhythm in this condition
+            loop_begin = delays_list[k] + j * len_rhythm_ms - 0.5*ems_constants.milliseconds_per_eighthnote #include half an eighthnote before
+            loop_end = loop_begin + len_rhythm_ms + 1 * ems_constants.milliseconds_per_eighthnote #include one eighthnote after as well
             contact_bool = np.logical_and((surpressed_contact_onset_times >= loop_begin), (surpressed_contact_onset_times <= loop_end)) # select contact onset times during this loop of rhythm
             audio_bool = np.logical_and((audio_onset_times >= loop_begin), (audio_onset_times <= loop_end)) # select audio onset times during this loop of rhythm
-            total_spikes_contact = sum(contact_bool) # how many spikes total?
-            total_spikes_audio = sum(audio_bool)
+            spike_times_contact = surpressed_contact_onset_times[contact_bool] - loop_begin # how many spikes total?
+            spike_times_audio = audio_onset_times[audio_bool] - loop_begin
             trace_selector_bool = np.logical_and((x_vec >= loop_begin), (x_vec <= loop_end)) # which indices in traces are during this loop?
             contact_trace_selected = surpressed_contact_trace[trace_selector_bool] # pick those data points from suprpressed contact trace
             audio_trace_selected = audio_trace[trace_selector_bool] # pick those data points from audio trace
-            emd = earth_movers_distance(contact_trace_selected, audio_trace_selected, total_spikes_contact, total_spikes_audio) # run emd
+            emd = earth_movers_distance(spike_times_contact, spike_times_audio, contact_trace_selected, audio_trace_selected) # run emd
             distances_list.append(emd) # add to appropriate list.
-            contact_onsets_selected = surpressed_contact_onset_times[contact_bool]
-            audio_onsets_selected = audio_onset_times[audio_bool]
-            vp_dist = victor_purp(contact_onsets_selected, audio_onsets_selected, loop_begin, loop_end)
+            vp_dist = victor_purp(spike_times_contact, spike_times_audio, loop_begin, loop_end)
             vp_dist_list.append(vp_dist) 
+            title = "total spikes contact: " + str(len(spike_times_contact)) + " total_spikes audio: " + str(len(spike_times_audio)) + " emd = " + str(emd) +  " vic purp: " + str(vp_dist)
+            # plot_traces(x_vec[trace_selector_bool], [contact_trace_selected, audio_trace_selected], ems_constants.samp_period_ms, ["contact", "audio"], title)
+            
+            
     
     list_of_vp_distances.append(vp_dist_list)
     list_of_emd_distances.append(distances_list)
@@ -182,17 +217,17 @@ for i in range(len(ems_constants.rhythm_strings)):
 
     # get intervals in this rhythm
     var_lists = []
-    for i in range(num_conditions):
+    for k in range(num_conditions):
         ground_truth_intervals = []
         user_intervals = []
         user_error = []
-        this_condition_bools = np.logical_and((audio_onset_times > delays_list[i]), (audio_onset_times < delays_list[i+1]))
+        this_condition_bools = np.logical_and((audio_onset_times > delays_list[k]), (audio_onset_times < delays_list[k+1]))
         condition_audio_onsets = audio_onset_times[this_condition_bools]
         for j in range(len(condition_audio_onsets)-1):
             gt_interval = condition_audio_onsets[j+1] - condition_audio_onsets[j]
             # get nearest response pulse to audio
             arg_min = np.argmin(np.abs(np.subtract(surpressed_contact_onset_times, condition_audio_onsets[j+1]))) # throws out the first one...
-            user_interval = surpressed_contact_onset_times[arg_min] - condition_audio_onsets[i]#response time user - previous audio pulse
+            user_interval = surpressed_contact_onset_times[arg_min] - condition_audio_onsets[j]#response time user - previous audio pulse
             ground_truth_intervals.append(gt_interval)
             user_intervals.append(user_interval)
             user_error.append(np.abs(gt_interval-user_interval))
@@ -212,19 +247,21 @@ r_sqs = []
 
 # wing kris across rhythms for each condition
 for i in range(num_conditions):
-    list_of_vars_for_condition = [] # first dim, len_rhythm_types long. second dim, ground truth, user, user_error.
+    list_of_vars_for_condition = [] # first dim, len_rhythm_types long. second dim, condition, third, ground truth, user, user_error.
     for j in range(len(ems_constants.rhythm_strings)):
         list_of_vars_for_condition.append(list_of_WK_var_lists[j][i])
     ground_truth_intervs_across_rhythms = [el[0] for el in list_of_vars_for_condition] # get all gt intervals
+    ground_truth_intervs_across_rhythms_flat = sum(ground_truth_intervs_across_rhythms, [])
     # get list of unique intervals and indices that map all intervals to their assigned unique interval
-    unique_gt_intervals, indices = compile_unique_interval_list(ground_truth_intervals, ems_constants.interval_tolerance)
+    unique_gt_intervals, indices = compile_unique_interval_list(ground_truth_intervs_across_rhythms_flat, ems_constants.interval_tolerance)
     user_intervals_across_rhythms = [el[1] for el in list_of_vars_for_condition] # get all user intervasl
+    user_intervals_across_rhythms_flat = sum(user_intervals_across_rhythms, [])
     list_of_user_intervals_by_target_interval = [[]] * len(unique_gt_intervals) # make a list of lists as long as unique intervals
-    for k in range(len(user_intervals_across_rhythms)): # for every user interval
+    for k in range(len(user_intervals_across_rhythms_flat)): # for every user interval
         target_interval_index = indices[k] # find its unique target 
         # now add it to the list of intervals produced for that target
         #within the list of unique intervals
-        list_of_user_intervals_by_target_interval[target_interval_index].append(user_intervals_across_rhythms[k])
+        list_of_user_intervals_by_target_interval[target_interval_index].append(user_intervals_across_rhythms_flat[k])
     interval_means_list = [sum(item_list)/len(item_list) for item_list in list_of_user_intervals_by_target_interval]
     interval_sd_list = [np.std(item_list) for item_list in list_of_user_intervals_by_target_interval]
     slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(interval_means_list, interval_sd_list) 

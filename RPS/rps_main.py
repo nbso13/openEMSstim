@@ -14,7 +14,7 @@ bluetooth.write(b"1")
 
 def execute(bluetooth, command_str, execution_lengths, execution_strengths):
     if command_str == "r":
-        ex_stren = execution_strengths[0]-30 #because combines with other stim
+        ex_stren = execution_strengths[0]-20 #because combines with other stim
         command_bytes_0 = "C0I" + str(ex_stren) + "T" + str(execution_lengths[0]) + "G \n"
         byt_com_0 = bytes(command_bytes_0, encoding='utf8')
         command_bytes_1 = "C1I" + str(execution_strengths[1]) + "T" + str(execution_lengths[1]) + "G \n"
@@ -45,8 +45,8 @@ listen(bluetooth)
 
 input("adjust ems channel intensity to 26!")
 
-leng = [165, 170] # stim len ms
-stren = [96, 96]
+leng = [200, 180] # stim len ms
+stren = [100, 96]
 while True:
     out = input("comm?")
     execute(bluetooth, out, leng, stren)
